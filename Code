@@ -1,0 +1,656 @@
+#Task1------------------------------
+#R code to import and prepare the EWCS dataset
+setwd("C:/Users/Lenovo/Desktop/EWSC")
+ewcs=read.table("EWCS_2016.csv",sep=",",header=TRUE)
+ewcs[,][ewcs[, ,] == -999] <- NA
+kk=complete.cases(ewcs)
+ewcs=ewcs[kk,]
+library(caTools)
+library(corrplot)
+library(dplyr)
+##Summary of EWCS
+summary(ewcs)
+##Overall scatterplot matrix analysis
+panel.cor <- function(x, y) +
+  usr <- par("usr"); on.exit(par(usr)) +
+  par(usr = c(0, 1, 0, 1)) +
+  r <- round(cor(x, y), digits=2) +
+  txt <- paste0("R = ", r) +
+  text(0.5, 0.5, txt)
+pairs(~ . , panel = panel.smooth, data = ewcs, lower.panel=panel.cor, main="Scatterplot Matrix")
+###Q87a and Q87b are moderately correlated in positive way. 
+###It implies to the subsequent pairs (Q87b & Q87c, Q87c & Q 87d, Q87d & Q87e, Q87a & Q87e, .)
+###we can visualize the respondents gave a high rating in Q87a, are also giving Q87b a high rating. Those who rated Q87a low are likely to rate Q87b low
+###the same observations imply to the Q90a to Q90f. 
+#Principle Component Analysis----------------------------------------
+data <- ewcs
+pc <- prcomp(data, scale=T)
+summary(pc)
+library(factoextra)
+library(ggplot2)
+fviz_screeplot(pc)
+###We take PC1 to PC4 into consideration as they covered 70% of variances 
+##rotate to better understand each component's contribution
+pc$rotation
+###PC1 suggest gender and age do not contribute much in the questionnaire, but they are relatively important component in PC2, PC3 and PC4.  
+###PC2 results of only Q90a to Q90f return positive value heavy loading, shows they are measuring a same characteristic
+###PC1 indicates Q87a to Q87e contribute heavily, we can say that the set measures another characteristic
+##Exclude Q90a to Q90f in the analysis
+data1 <- ewcs[,1:7]
+pc1 <- prcomp(data1, scale=T)
+summary(pc1)
+###We analyze PC1 and PC2 as they cover 66% of variances
+##rotate to better understand each component's contribution
+pc1$rotation
+###Q2a (gender) shows only 0.046 contribution to PC1, with positive direction
+###female has slightly higher score than male 
+###Q2b (age) has a positive correlation in the component and it is relatively important in PC2
+##Exclude Q87a to Q87e in the analysis
+data2 <- ewcs[, -c(3:7)]
+pc2 <- prcomp(data2, scale=T)
+summary(pc2)
+###PC1, PC2 and PC3 capture about 70% of variance
+##rotate to better understand each component's contribution
+pc2$rotation
+###PCA concludes that Q87a to Q87e assess a same characteristic, whereas Q90a to Q90f assess another characteristic
+###PC2&3 of gender and age are important components. 
+#K-mean Clustering (Gender)------------------------------------
+##Determine optimal number of cluster for k-mean clustering
+set.seed(2020)
+library(cluster)
+gap_stat <- clusGap(data.scaled, FUN = kmeans, nstart = 50, K.max = 10, B = 50)
+fviz_gap_stat(gap_stat)
+##Select k=2
+k2 <- kmeans(data.scaled, 2, nstart = 50)
+print(k2)
+k2results <- data.frame(data$Q2a, data$Q2b, data$Q87a,data$Q87b ,data$Q87c, data$Q87d, data$Q87e, data$Q90a, data$Q90b, data$Q90c, data$Q90f, k2$cluster)
+cluster1 <- subset(k2results, k2$cluster==1)
+cluster2 <- subset(k2results, k2$cluster==2)
+cluster1$Q2a <- factor(cluster1$data.Q2a)
+cluster2$Q2a <- factor(cluster2$data.Q2a)
+##Observe the summary using cluster1&2
+summary(cluster1$data.Q87a)
+summary(cluster2$data.Q87a)
+###cluster2 is higher than cluster1
+summary(cluster1$data.Q87b)
+summary(cluster2$data.Q87b)
+###cluster2 is higher than cluster1
+summary(cluster1$data.Q87c)
+summary(cluster2$data.Q87c)
+###cluster2 is higher than cluster1
+summary(cluster1$data.Q87d)
+summary(cluster2$data.Q87d)
+###cluster2 is higher than cluster1
+summary(cluster1$data.Q87e)
+summary(cluster2$data.Q87e)
+###cluster2 is higher than cluster1
+summary(cluster1$data.Q90a)
+summary(cluster2$data.Q90a)
+###cluster2 is higher than cluster1
+summary(cluster1$data.Q90b)
+summary(cluster2$data.Q90b)
+###cluster2 is higher than cluster1
+summary(cluster1$data.Q90c)
+summary(cluster2$data.Q90c)
+###cluster2 is higher than cluster1
+summary(cluster1$data.Q90f)
+summary(cluster2$data.Q90f)
+###cluster2 is higher than cluster1
+##Observe the proportion of gender in cluster
+round(prop.table(table(cluster1$data.Q2a)),2)
+round(prop.table(table(cluster2$data.Q2a)),2)
+plot(round(prop.table(table(cluster1$data.Q2a)),2), main="cluster1")
+plot(round(prop.table(table(cluster2$data.Q2a)),2), main="cluster2")
+###More male in cluster1, more female in cluster2
+#Goodness-of-fit test
+##Is cluster1 statistically same as cluster2 in terms of Q2a(gender)
+M <- as.matrix(table(cluster1$data.Q2a))
+p.null <- as.vector(prop.table(table(cluster2$data.Q2a)))
+chisq.test(M, p=p.null)
+###We conclude that gender is a differentiator of the dataset.
+#K-mean Clustering (Age)------------------------------------
+summary(data$Q2b)
+agegrp<-cut(data$Q2b, c(14,24,34,44,54,64,74,101),
+            labels=c("15-24", "25-34", "35-44", "45-54", "55-64", "65-74", "75+"),
+            xlim=c(15,80))
+##Perform k-mean clustering
+k2age <- kmeans(data.scaled, centers = 2)
+k2results1 <- data.frame(agegrp, data$Q2a, data$Q87a, data$Q87b, data$Q87c, data$Q87d, data$Q87e, data$Q90a, data$Q90b, data$Q90c, data$Q90f, k2$cluster)
+cluster1 <- subset(k2results1, k2$cluster==1)
+cluster2 <- subset(k2results1, k2$cluster==2)
+cluster1$agegrp <- factor(cluster1$agegrp)
+cluster2$agegrp <- factor(cluster2$agegrp)
+##Observe the summary using cluster1&2
+summary(cluster1$data.Q87a)
+summary(cluster2$data.Q87a)
+###Cluster2 is higher than cluster1
+summary(cluster1$data.Q87b)
+summary(cluster2$data.Q87b)
+###Cluster2 is higher than cluster1
+summary(cluster1$data.Q87c)
+summary(cluster2$data.Q87c)
+###Cluster2 is higher than cluster1
+summary(cluster1$data.Q87d)
+summary(cluster2$data.Q87d)
+###Cluster2 is higher than cluster1
+summary(cluster1$data.Q87e)
+summary(cluster2$data.Q87e)
+###Cluster2 is higher than cluster1
+summary(cluster1$data.Q90a)
+summary(cluster2$data.Q90a)
+###Cluster2 is higher than cluster1
+summary(cluster1$data.Q90b)
+summary(cluster2$data.Q90b)
+###Cluster2 is higher than cluster1
+summary(cluster1$data.Q90c)
+summary(cluster2$data.Q90c)
+###Cluster2 is higher than cluster1
+summary(cluster1$data.Q90f)
+summary(cluster2$data.Q90f)
+###Cluster2 is higher than cluster1
+##Observe the proportion of age group in cluster
+round(prop.table(table(cluster1$agegrp)),2)
+round(prop.table(table(cluster2$agegrp)),2)
+plot(round(prop.table(table(cluster1$agegrp)),2), main="cluster1")
+plot(round(prop.table(table(cluster2$agegrp)),2), main="cluster2")
+###Cluster2 has 21% of 34 years old and below, 73% at the age of 35-64
+###Cluster1 has 30% of 34 years old and below, 69% at the age of 35-64
+#Goodness-of-fit test
+##Is cluster1 statistically same as cluster2 in terms of Q2a(age group)
+M <- as.matrix(table(cluster1$agegrp))
+p.null <- as.vector(prop.table(table(cluster2$agegrp)))
+chisq.test(M, p=p.null)
+###We conclude that age is a differentiator of the dataset.
+#End of Task1------------------------------------------------------------
+#Task2------------------------------------------------------
+##R code to import and prepare the student performance dataset
+##Setting all characters as factors
+setwd("C:/Users/Lenovo/Desktop/EWSC")
+school1=read.table("student-mat.csv", stringsAsFactors = TRUE, sep=";",header=TRUE)
+school2=read.table("student-por.csv",stringsAsFactors = TRUE,sep=";",header=TRUE)
+schools=merge(school1,school2,by=c("school","sex","age","address","famsize","Pstatus","Medu","Fedu","Mjob","Fjob","reason","nursery","internet"))
+library(gridExtra)
+library(data.table)
+library(tidyverse)
+library(dplyr)
+library(readr)
+library(stringr)
+library(ggplot2)
+library(caret)
+library(rpart)
+library(rattle)
+library(randomForest)
+library(outliers)
+library(pander)
+#Visualize the summary
+summary(schools)
+##Visualize the grade in different subject
+schools %>%
+  gather('G3.x', 'G3.y', key="subject", value="grade") %>%
+  ggplot() +
+  geom_bar(aes(x=grade, fill=subject), position="dodge") +
+  ggtitle("Distribution of final grades in Math and Portuguese courses") +
+  scale_fill_discrete(name = "subject", labels = c("Math", "Portuguese"))
+###Most of the students scored 13 for Portuguese, most of the students scored 10 for Math
+c(mean(schools$G3.x), mean(schools$G3.y))
+###students score better in Portuguese
+c(mean(school1$G3), mean(school2$G3))
+###the mean of final grade of all the students in math (10.42) is not much different than the subset of students in both math and Portuguese (10.39), the mean final grades of the subset of Portuguese students is slightly different (11.91 total vs 12.52 subset).
+###because almost all of the students in the math course are in the combined dataset, but there are about 300 additional students in Portuguese dataset.
+c(mean(school1$G1), mean(school1$G2), mean(school1$G3))
+c(mean(schools$G1.x), mean(schools$G2.x), mean(schools$G3.x))
+###all students in math as well as the subset of math students the mean grade slightly decreases as the semester progresses.
+c(mean(school2$G1), mean(school2$G2), mean(school2$G3))
+c(mean(schools$G1.y), mean(schools$G2.y), mean(schools$G3.y))
+###all students in Portuguese as well as the subset of portuguese students the mean grade slightly increases as the semester progresses.
+Mcor1<-ggplot(school1,aes(x=G1,y=G3)) +
+  geom_point() + geom_smooth(method = 'lm') +
+  ggtitle("G1vsG3 (MATH)")
+Pcor1<-ggplot(school2,aes(x=G1,y=G3)) +
+  geom_point() + geom_smooth(method = 'lm') +
+  ggtitle("G1vsG3 (POR)")
+grid.arrange(Mcor1, Pcor1)
+###A strong linear relationship between G3 and G1 for both math and portuguese
+Mcor2<-ggplot(school1,aes(x=G2,y=G3)) +
+  geom_point() + geom_smooth(method = 'lm') +
+  ggtitle("G2vsG3 (MATH)")
+Pcor2<-ggplot(school2,aes(x=G2,y=G3)) +
+  geom_point() + geom_smooth(method = 'lm') +
+  ggtitle("G2vsG3 (POR)")
+grid.arrange(Mcor2, Pcor2)
+###A strong linear relationship between G3 and G2 for both math and portuguese
+mathgrades <- school1 %>%
+  gather("G1", "G2", "G3", key="semester", value="grade")%>%
+  ggplot() +
+  geom_bar(aes(x=grade, fill=semester), position="dodge") +
+  ggtitle("Distribution of three grades in Math")
+portgrades <- school2 %>%
+  gather("G1", "G2", "G3", key="semester", value="grade") %>%
+  ggplot() +
+  geom_bar(aes(x=grade, fill=semester), position="dodge") +
+  ggtitle("Distribution of three grades in Portuguese")
+grid.arrange(mathgrades, portgrades)
+###increasing trend in Portuguese
+###decreasing trend in math is most likely due to the increasing number of students with a grade of 0
+###these plots inform us that G1 and G2 would be effective in predicting G3
+###the summary statistics above tell us that there are not drastic differences in grades between the subsets and all students in both math and Portuguese.
+GMath <- ggplot(school1, aes(x=G3)) +
+  geom_density(aes(color=sex)) +
+  ggtitle("Distribution of Math students' grades by gender")
+GPort <- ggplot(school2, aes(x=G3)) +
+  geom_density(aes(color=sex)) +
+  ggtitle("Distribution of Portuguese students' grades by gender")
+grid.arrange(GMath, GPort)
+###Male score better in math, whereas female score better in Portuguese
+mathgrades2school <- ggplot(school1) +
+  geom_bar(aes(x=school, fill=as.factor(G3)), position="dodge") +
+  ggtitle("Distribution of Math grades by school") +
+  theme(legend.position = "none")
+portgrades2school <- ggplot(school2) +
+  geom_bar(aes(x=school, fill=as.factor(G3)), position="dodge") +
+  ggtitle("Distribution of Portuguese grades by school") +
+  theme(legend.position = "none")
+grid.arrange(mathgrades2school, portgrades2school)
+###mean grades tend to be higher in the GP school
+schoolMath <- ggplot(school1, aes(x=G3)) +
+  geom_density(aes(color=school)) +
+  ggtitle("Distribution of Math students' grades by school")
+schoolPort <- ggplot(school2, aes(x=G3)) +
+  geom_density(aes(color=school)) +
+  ggtitle("Distribution of Portuguese students' grades by school")
+grid.arrange(schoolMath, schoolPort)
+###math grades between the two schools is similar
+###students from Gabriel Pereira outperform those from Mousinho da Silveira in Portuguese.
+mjobMath <- ggplot(school1, aes(x=G3)) +
+  geom_density(aes(color=as.factor(Mjob))) +
+  ggtitle("Distribution of students' Math grades by mothers' job")
+mjobPort <- ggplot(school2, aes(x=G3)) + #d2
+  geom_density(aes(color=as.factor(Mjob))) + #Fjob
+  ggtitle("Distribution of students' Portuguese grades by mothers' job")
+grid.arrange(mjobMath, mjobPort)
+###For Math subject, students whose mothers have jobs in health outperform other students
+###For Portuguese subject, students whose mothers stay at home seem to underperform compared to other students.
+fjobMath <- ggplot(school1, aes(x=G3)) +
+  geom_density(aes(color=as.factor(Fjob))) +
+  ggtitle("Distribution of students' Math grades by fathers' job")
+fjobPort <- ggplot(school2, aes(x=G3)) + #d2
+  geom_density(aes(color=as.factor(Fjob))) +
+  ggtitle("Distribution of students' Portuguese grades by fathers' job")
+grid.arrange(fjobMath, fjobPort)
+###For both math and Portuguese, students whose fathers are teachers outperform other students.
+famMath <- ggplot(school1, aes(x=G3)) +
+  geom_density(aes(color=as.factor(famrel))) +
+  ggtitle("Distribution of students' Math grades by family relationships")
+famPort <- ggplot(school2, aes(x=G3)) +
+  geom_density(aes(color=as.factor(famrel))) +
+  ggtitle("Distribution of students' Portuguese grades by family relationships")
+grid.arrange(famMath, famPort)
+###the average grade of students with the worst family relationships is higher than students with better relationships for math
+###those who scored better in Portuguese has good family relationship
+traveltimeMath <- ggplot(school1, aes(x=G3)) +
+  geom_density(aes(color=as.factor(traveltime))) +
+  ggtitle("Distribution of students' Math grades by home to school travel time")
+traveltimePort <- ggplot(school2, aes(x=G3)) +
+  geom_density(aes(color=as.factor(traveltime))) +
+  ggtitle("Distribution of students' Portuguese grades by home to school travel time")
+grid.arrange(traveltimeMath, traveltimePort)
+###students with the highest travel time have lower average grades in both math and Portuguese
+###students with the lowest travel time tend to score better in both math and Portuguese
+studyMath <- ggplot(school1, aes(x=G3)) +
+  geom_density(aes(color=as.factor(studytime))) +
+  ggtitle("Distribution of students' Math grades by weekly study time")
+studyPort <- ggplot(school2, aes(x=G3)) +
+  geom_density(aes(color=as.factor(studytime))) +
+  ggtitle("Distribution of students' Portuguese grades by weekly study time")
+grid.arrange(studyMath, studyPort)
+###higher grades is attributed to more study time,
+failMath <- ggplot(school1, aes(x=G3)) +
+  geom_density(aes(color=as.factor(failures))) +
+  ggtitle("Distribution of students' Math grades by number of past class failures")
+failPort <- ggplot(school2, aes(x=G3)) +
+  geom_density(aes(color=as.factor(failures))) +
+  ggtitle("Distribution of students' Portuguese grades by number of past class failures")
+grid.arrange(failMath, failPort)
+###higher grades is attributed to less past class failure
+schoolsupmath <- ggplot(school1) +
+  geom_bar(aes(x=schoolsup, fill=as.factor(G3)), position="dodge") +
+  ggtitle("Distribution of Math grades by extra educational support") +
+  theme(legend.position = "none")
+schoolsuppor <- ggplot(school2) +
+  geom_bar(aes(x=schoolsup, fill=as.factor(G3)), position="dodge") +
+  ggtitle("Distribution of Portuguese grades by extra educational support") +
+  theme(legend.position = "none")
+grid.arrange(schoolsupmath, schoolsuppor)
+###those who receive educational support's student has average score for both math and portuguese, but not likely to fail
+###those who did not receive educational support's student score better for both math and portuguese, but there is also high possibility of failure
+###student who did not receive educational support in math tend to has higher fail rate
+famsupmath <- ggplot(school1) +
+  geom_bar(aes(x=famsup, fill=as.factor(G3)), position="dodge") +
+  ggtitle("Distribution of Math grades by family educational support") +
+  theme(legend.position = "none")
+famsuppor <- ggplot(school2) +
+  geom_bar(aes(x=famsup, fill=as.factor(G3)), position="dodge") +
+  ggtitle("Distribution of Portuguese grades by family educational support") +
+  theme(legend.position = "none")
+grid.arrange(famsupmath, famsuppor)
+###there are no much different in the distribution of math and portuguese score in terms of family educational support
+paidmath <- ggplot(school1) +
+  geom_bar(aes(x=paid, fill=as.factor(G3)), position="dodge") +
+  ggtitle("Distribution of Math grades by extra paid classes within the course subject") +
+  theme(legend.position = "none")
+paidpor <- ggplot(school2) +
+  geom_bar(aes(x=paid, fill=as.factor(G3)), position="dodge") +
+  ggtitle("Distribution of Portuguese grades by extra paid classes within the course subject") +
+  theme(legend.position = "none")
+grid.arrange(paidmath, paidpor)
+###Less student take an extra paid classes for Portuguese class, more students take up math extra paid classes
+###student who took math extra paid classes are less likely to fail compared to those who did not take extra paid classes in math
+###the mean grade is higher in those who did not have extra paid claases in math
+activitiesmath <- ggplot(school1) +
+  geom_bar(aes(x=activities, fill=as.factor(G3)), position="dodge") +
+  ggtitle("Distribution of Math grades by extra-curricular activities") +
+  theme(legend.position = "none")
+activitiespor <- ggplot(school2) +
+  geom_bar(aes(x=activities, fill=as.factor(G3)), position="dodge") +
+  ggtitle("Distribution of Portuguese grades by extra-curricular activities") +
+  theme(legend.position = "none")
+grid.arrange(activitiesmath, activitiespor)
+###there are no much different in the distribution of portuguese score in terms of participation in extra-curricular activities
+###those who participated in extra-curricular activities has higher mean grade
+nurserymath <- ggplot(school1) +
+  geom_bar(aes(x=nursery, fill=as.factor(G3)), position="dodge") +
+  ggtitle("Distribution of Math grades by attended nursery school") +
+  theme(legend.position = "none")
+nurserypor <- ggplot(school2) +
+  geom_bar(aes(x=nursery, fill=as.factor(G3)), position="dodge") +
+  ggtitle("Distribution of Portuguese grades by attended nursery school") +
+  theme(legend.position = "none")
+grid.arrange(nurserymath, nurserypor)
+###More students have attended nursery before in these two dataset
+###students attended nursery before tend to score better in math
+###there is no much different between those who attended nursery school and not attended before in their portuguese score
+highermath <- ggplot(school1) +
+  geom_bar(aes(x=higher, fill=as.factor(G3)), position="dodge") +
+  ggtitle("Distribution of Math grades by wants to take higher education") +
+  theme(legend.position = "none")
+higherpor <- ggplot(school2) +
+  geom_bar(aes(x=higher, fill=as.factor(G3)), position="dodge") +
+  ggtitle("Distribution of Portuguese grades by wants to take higher education") +
+  theme(legend.position = "none")
+grid.arrange(highermath, higherpor)
+###higher grades is attributed to intent to pursue higher education.
+internetmath <- ggplot(school1) +
+  geom_bar(aes(x=internet, fill=as.factor(G3)), position="dodge") +
+  ggtitle("Distribution of Math grades by Internet access at home") +
+  theme(legend.position = "none")
+internetpor <- ggplot(school2) +
+  geom_bar(aes(x=internet, fill=as.factor(G3)), position="dodge") +
+  ggtitle("Distribution of Portuguese grades by Internet access at home") +
+  theme(legend.position = "none")
+grid.arrange(internetmath, internetpor)
+###With internet access,students tend to score better grade in both Math and Portuguese
+romanticmath <- ggplot(school1) +
+  geom_bar(aes(x=romantic, fill=as.factor(G3)), position="dodge") +
+  ggtitle("Distribution of Math grades by with a romantic relationship") +
+  theme(legend.position = "none")
+romanticpor <- ggplot(school2) +
+  geom_bar(aes(x=romantic, fill=as.factor(G3)), position="dodge") +
+  ggtitle("Distribution of Portuguese grades by with a romantic relationship") +
+  theme(legend.position = "none")
+grid.arrange(romanticmath, romanticpor)
+###the mean grade is lower in those who committed in relationship for math and portuguese
+#Then, we separate student into two groups, below mean grade and above mean grade
+data.m <- school1 %>% mutate(performance = factor(ifelse(G3 >= mean(G3), 1, 0), labels = c("fail", "pass")))
+data.p <- school2 %>% mutate(performance = factor(ifelse(G3 >= mean(G3), 1, 0), labels = c("fail", "pass")))
+Dmath <- ggplot(data.m) +
+  geom_bar(aes(x=Dalc, fill=as.factor(performance)), position="dodge") +
+  ggtitle("Distribution of Math grades by workday alcohol consumption") +
+  theme(legend.position = "right")
+Dpor <- ggplot(data.p) +
+  geom_bar(aes(x=Dalc, fill=as.factor(performance)), position="dodge") +
+  ggtitle("Distribution of Portuguese grades by workday alcohol consumption") +
+  theme(legend.position = "right")
+grid.arrange(Dmath, Dpor)
+###More alcohol consumption in weekday result in highest possibility to score below the mean grade in both math and portuguese
+Wmath <- ggplot(data.m) +
+  geom_bar(aes(x=Walc, fill=as.factor(performance)), position="dodge") +
+  ggtitle("Distribution of Math grades by weekend alcohol consumption") +
+  theme(legend.position = "right")
+Wpor <- ggplot(data.p) +
+  geom_bar(aes(x=Walc, fill=as.factor(performance)), position="dodge") +
+  ggtitle("Distribution of Portuguese grades by weekend alcohol consumption") +
+  theme(legend.position = "right")
+grid.arrange(Wmath, Wpor)
+###More alcohol consumption in weekend result in highest possibility to score below the mean grade in both math and portuguese
+###More students consuming alcohol in weekend compared to weekday
+###Combining the results of weekday and weekend alcohol consumption, it seems like more alcohol consumption may affect the grades in negative way
+AbMath <- ggplot(data.m, aes(x=absences)) +
+  geom_density(aes(color=as.factor(performance))) +
+  ggtitle("Distribution of students' Math grades by number of school absences") +
+  theme(legend.position = "bottom")
+AbPort <- ggplot(data.p, aes(x=absences)) +
+  geom_density(aes(color=as.factor(performance))) +
+  ggtitle("Distribution of students' Portuguese grades by number of school absences") +
+  theme(legend.position = "bottom")
+grid.arrange(AbMath, AbPort)
+###With more number of school absences, the grade tends to be lower.
+##omitted 3 variables (freetime, gooout and health)
+cor.test(as.numeric(data.m$goout), as.numeric(data.m$performance))
+cor.test(as.numeric(data.p$goout), as.numeric(data.p$performance))
+###go out with friends return a very low negative correlation value to the performance in both subject (-0.15 & -0.11)
+cor.test(as.numeric(data.m$freetime), as.numeric(data.m$performance))
+cor.test(as.numeric(data.p$freetime), as.numeric(data.p$performance))
+###free time return a very low negative correlation value to the performance in both subject (-0.001, -0.11)
+cor.test(as.numeric(data.m$health), as.numeric(data.m$performance))
+cor.test(as.numeric(data.p$health), as.numeric(data.p$performance))
+###health status return a very low negative correlation value to the performance in both subject (-0.01, -0.085)
+library(dplyr)
+library(ClustOfVar)
+library(ggplot2)
+schools2 <- schools[, -which(colnames(schools) %in% c("G1.x", "G2.x", "G1.y", "G2.y"))]
+schools2 <- schools2 %>% 
+  mutate_if(is.character, as.factor)
+schools2 <- na.omit(schools2)
+head(schools2)
+xquant <- schools2[,c(3,7,8,15,16,17,24,25,26,27,28,29,30,31,33,34,35,42:49)] # Numeric variables
+xqual <- schools2[,c(1,2,4,5,6,9,10,11,12,13,14,18,19,20,21,22,23,32,36,37,38,39,40,41)]      # Categorical variables
+tree <- hclustvar(xquant, xqual)
+plot(tree)
+cuttr <- cutree(tree, k=5, h=0.1)
+simvars <- as.data.frame(cuttr)
+colnames(simvars) <- "Cluster"
+simvars$Variable <- names(cuttr)
+simvars%>% ggplot()+
+  geom_point(aes(Cluster, Variable))
+#PCA--------------------------
+mathStudents <- school1
+portStudents <- school2
+# convert predictors to numeric
+for(i in colnames(mathStudents)) 
+  mathStudents[,i] <- as.numeric(mathStudents[,i]) 
+  portStudents[,i] <- as.numeric(portStudents[,i])
+d1_pca <- data.frame(scale(mathStudents))
+d2_pca <- data.frame(scale(portStudents))
+K <- 5
+mathMod.km <- kmeans(d1_pca,K,nstart=25) 
+portMod.km <- kmeans(d2_pca,K,nstart=25) 
+# fviz_cluster - compute the principal components for math
+library(factoextra)
+mathMod.pc <- prcomp(d1_pca)
+fviz_pca_var(mathMod.pc) + 
+  ggtitle("PCA for Math students")
+PorMod.pc <- prcomp(d2_pca)
+fviz_pca_var(PorMod.pc) + 
+  ggtitle("PCA for Por students")
+#Logistics Regression---------------------------
+## Normalizing data
+d1.bin = school1
+d1.bin$performance = factor(ifelse(school1$G3 >= 10, "pass", "fail"))
+d2.bin = school2
+d2.bin$performance = factor(ifelse(school2$G3 >= 10, "pass", "fail"))
+d1.bin = subset(d1.bin, select = -c(G1,G2,G3))
+d2.bin = subset(d2.bin, select = -c(G1,G2,G3))
+norm.mat <- predict(preProcess(d1.bin[ , -dim(d1.bin)[2]], method = c("center", "scale")), d1.bin[ , -dim(d1.bin)[2]])
+norm.mat$performance <- d1.bin$performance
+norm.por <- predict(preProcess(d2.bin[ , -dim(d2.bin)[2]], method = c("center", "scale")), d2.bin[ , -dim(d2.bin)[2]])
+norm.por$pass <- d2.bin$performance
+dummy.mat <- data.frame(predict(dummyVars("~ .", data = norm.mat[ , -dim(norm.mat)[2]], fullRank = TRUE), newdata = norm.mat[ , -dim(norm.mat)[2]]))
+dummy.mat$pass <- norm.mat$performance
+dummy.por <- data.frame(predict(dummyVars("~ .", data = norm.por[ , -dim(norm.por)[2]], fullRank = TRUE), newdata = norm.por[ , -dim(norm.por)[2]]))
+dummy.por$pass <- norm.por$pass
+##Create training and test set
+set.seed(2020)
+index.mat <- createDataPartition(dummy.mat$pass, p = 0.7, list = FALSE)
+train.mat <- dummy.mat[index.mat, ]
+test.mat <- dummy.mat[-index.mat, ]
+str(train.mat)
+index.por<- createDataPartition(dummy.por$pass, p = 0.7, list = FALSE)
+train.por <- dummy.por[index.por, ]
+test.por <- dummy.por[-index.por, ]
+str(train.por)
+xTrans.mat <- preProcess(train.mat[ , -dim(train.mat)[2]], method = c("nzv", "corr"))
+xTrans.mat
+train.mat.prep <- predict(xTrans.mat, train.mat[ , -dim(train.mat)[2]])
+train.mat.prep$pass <- train.mat$pass
+test.mat.prep <- predict(xTrans.mat, test.mat[ , -dim(test.mat)[2]])
+test.mat.prep$pass <- test.mat$pass
+str(train.mat.prep)
+xTrans.por <- preProcess(train.por[ , -dim(train.por)[2]], method = c("nzv", "corr"))
+train.por.prep <- predict(xTrans.por, train.por[ , -dim(train.por)[2]])
+train.por.prep$pass <- train.por$pass
+test.por.prep <- predict(xTrans.por, test.por[ , -dim(test.por)[2]])
+test.por.prep$pass <- test.por$pass
+##base model with intercept only
+base.mod1 <- glm(pass ~ 1 , data=train.mat.prep,family=binomial)  # base intercept only model
+base.mod2 <- glm(pass ~ 1 , data= train.por.prep,family=binomial)  # base intercept only model
+##full model with all predictor variables
+all.mod1 <- glm(pass ~ . , data=train.mat.prep,family=binomial)
+all.mod2 <- glm(pass ~ . , data= train.por.prep,family=binomial)
+##perform step-wise algorithm
+stepMod1 <- step(base.mod1, scope = list(lower = base.mod1, upper = all.mod1), direction = "both", trace = 0, steps = 1000)  
+stepMod2 <- step(base.mod2, scope = list(lower = base.mod2, upper = all.mod2), direction = "both", trace = 0, steps = 1000)  
+##Get the shortlisted variables
+formula(stepMod1)
+formula(stepMod2)
+stepMod1
+stepMod2
+##Model building
+set.seed(2020)
+##Set train_control to bootstrap
+train_control <- trainControl(method="boot",number = 500)
+##Train the model using glm 
+model1 <- train(formula(stepMod1), data = train.mat.prep, method = "glm",trControl=train_control,family = binomial)
+model2 <- train(formula(stepMod2), data = train.por.prep, method = "glm",trControl=train_control,family = binomial)
+# View the summary of the model
+summary(model1)
+summary(model2)
+###Model1: "failures","goout" have their p value less than 0.05 so they are considered significant.
+###Model1:The smallest p-value here is associated with "failure".
+###Model2: "failures","school.MS","higher.yes" have their p value less than 0.05 so they are considered significant.
+###Model2:The smallest p-value here is associated with "failure".
+## Do prediction using the model
+glm.probs1 <- predict(model1, newdata = test.mat.prep, type = "raw")  
+glm.probs2 <- predict(model2, newdata = test.por.prep, type = "raw")  
+##Model Evaluation
+library(e1071)
+library(caret)
+##create a confusion matrix table
+TableM <- table(glm.probs1, test.mat.prep$pass)
+confusionMatrix((TableM), positive = "pass")
+###We have yield 68.64% of accuracy for this model, any significant deviation upward from the 50% baseline value makes the attempt relatively successful.
+###With a p-value < 0.05
+TableP <- table(glm.probs2, test.por.prep$pass)
+confusionMatrix((TableP), positive = "pass")
+###We have yield 84.54% of accuracy for this model, any significant deviation upward from the 50% baseline value makes the attempt relatively successful.
+###With a p-value < 0.05
+#Decision Tree---------------------
+library(rpart)
+library(rpart.plot)
+library(rattle)
+modelformula <- pass ~ .
+data.tree1 <-  rpart(modelformula,
+                    data = train.mat.prep, method = 'class')
+fancyRpartPlot(data.tree1, main="Model - Decision Tree - Math")
+data.tree2 <-  rpart(modelformula,
+                    data = train.por.prep, method = 'class')
+fancyRpartPlot(data.tree2, main="Model - Decision Tree - Portuguese")
+# Making a prediction based on previous Tree
+prediction1 <- predict(data.tree1, test.mat.prep)
+prediction2 <- predict(data.tree2, test.por.prep)
+# Calculating the error
+pred.m <- ifelse(prediction1 > 0.5, "1","0") 
+test.mat.prep$pass1 <- ifelse(test.mat.prep$pass == 'pass', 1, 0)
+test.mat.prep$fail <- ifelse(test.mat.prep$pass == 'fail', 1, 0)
+test.mat.prep$performance <- cbind(test.mat.prep$pass1, test.mat.prep$fail)
+ta.m <- table(pred.m, test.mat.prep$performance)
+confusionMatrix((ta.m), positive = "1")
+###We have yield 61.86% of accuracy for this model, any significant deviation upward from the 50% baseline value makes the attempt relatively successful.
+###With a p-value < 0.05
+pred.p <- ifelse(prediction1 > 0.5, "1","0") 
+test.por.prep$pass1 <- ifelse(test.por.prep$pass == 'pass', 1, 0)
+test.por.prep$fail <- ifelse(test.por.prep$pass == 'fail', 1, 0)
+test.por.prep$performance <- cbind(test.por.prep$pass1, test.por.prep$fail)
+ta.p <- table(pred.p, test.por.prep$performance)
+confusionMatrix((ta.p), positive = "1")
+###We have yield 67.53% of accuracy for this model, any significant deviation upward from the 50% baseline value makes the attempt relatively successful.
+###With a p-value < 0.05
+###Both math and portuguese using decision tree model result in a decrease of accuracy compared to logistics regression model
+#Random Forest-------------------------------------------------------
+set.seed(2020)
+library(randomForest)
+d1.bin = school1
+d1.bin$performance = factor(ifelse(school1$G3 >= 10, "pass", "fail"))
+d2.bin = school2
+d2.bin$performance = factor(ifelse(school2$G3 >= 10, "pass", "fail"))
+d1.bin = subset(d1.bin, select = -c(G1,G2,G3))
+d2.bin = subset(d2.bin, select = -c(G1,G2,G3))
+norm.mat <- predict(preProcess(d1.bin[ , -dim(d1.bin)[2]], method = c("center", "scale")), d1.bin[ , -dim(d1.bin)[2]])
+norm.mat$performance <- d1.bin$performance
+norm.por <- predict(preProcess(d2.bin[ , -dim(d2.bin)[2]], method = c("center", "scale")), d2.bin[ , -dim(d2.bin)[2]])
+norm.por$pass <- d2.bin$performance
+dummy.mat <- data.frame(predict(dummyVars("~ .", data = norm.mat[ , -dim(norm.mat)[2]], fullRank = TRUE), newdata = norm.mat[ , -dim(norm.mat)[2]]))
+dummy.mat$pass <- norm.mat$performance
+dummy.por <- data.frame(predict(dummyVars("~ .", data = norm.por[ , -dim(norm.por)[2]], fullRank = TRUE), newdata = norm.por[ , -dim(norm.por)[2]]))
+dummy.por$pass <- norm.por$pass
+prop.table(table(dummy.mat$pass)[2:1])
+set.seed(2020)
+index.mat <- createDataPartition(dummy.mat$pass, p = 0.7, list = FALSE)
+train.mat <- dummy.mat[index.mat, ]
+test.mat <- dummy.mat[-index.mat, ]
+str(train.mat)
+index.por<- createDataPartition(dummy.por$pass, p = 0.7, list = FALSE)
+train.por <- dummy.por[index.por, ]
+test.por <- dummy.por[-index.por, ]
+str(train.por)
+
+xTrans.mat <- preProcess(train.mat[ , -dim(train.mat)[2]], method = c("nzv", "corr"))
+xTrans.mat
+train.mat.prep <- predict(xTrans.mat, train.mat[ , -dim(train.mat)[2]])
+train.mat.prep$pass <- train.mat$pass
+test.mat.prep <- predict(xTrans.mat, test.mat[ , -dim(test.mat)[2]])
+test.mat.prep$pass <- test.mat$pass
+str(train.mat.prep)
+xTrans.por <- preProcess(train.por[ , -dim(train.por)[2]], method = c("nzv", "corr"))
+#xTrans.por
+#xTrans.por$method$remove
+train.por.prep <- predict(xTrans.por, train.por[ , -dim(train.por)[2]])
+train.por.prep$pass <- train.por$pass
+test.por.prep <- predict(xTrans.por, test.por[ , -dim(test.por)[2]])
+test.por.prep$pass <- test.por$pass
+#str(train.por.prep)
+control <- trainControl(method = "boot", number = 100, classProbs = TRUE, summaryFunction = twoClassSummary)
+set.seed(2020)
+rf.mat.model <- train(x = train.mat.prep[ , -dim(train.mat.prep)[2]], y = train.mat.prep$pass, method = "rf", tuneLength = 3, trControl = control, metric = "ROC", verbose = FALSE)
+rf.mat.model
+varImp(rf.mat.model, scale = FALSE)
+rf.mat.test <- predict(rf.mat.model, newdata = test.mat.prep[ , -dim(test.mat.prep)[2]])
+rf.mat.test
+confusionMatrix(rf.mat.test, test.mat.prep$pass, positive="pass")
+##We have a 69.49% of accuracy for math 
+rf.por.model <- train(x = train.por.prep[ , -dim(train.por.prep)[2]], y = train.por.prep$pass, method = "rf", tuneLength = 3, trControl = control, metric = "ROC", verbose = FALSE)
+rf.por.model
+varImp(rf.por.model, scale = FALSE)
+rf.por.test <- predict(rf.por.model, newdata = test.por.prep[ , -dim(test.por.prep)[2]])
+rf.por.test
+confusionMatrix(rf.por.test, test.por.prep$pass, positive="pass")
+##We have a 85.05% of accuracy for portuguese
